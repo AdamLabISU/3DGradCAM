@@ -6,7 +6,6 @@ Aditya Balu, Sambit Ghadai, Kin Gwn Lore, Gavin Young, Adarsh Krishnamurthy, Sou
 Demo: [Adam Lab][2]
 <video controls="controls">
   <source type="video/mp4" src="demo.mp4"></source>
-  <p>Your browser does not support the video element.</p>
 </video>
 
 ## Packages needed
