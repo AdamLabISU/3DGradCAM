@@ -4,16 +4,20 @@ This is a repository for 3D Gradient weighted Class Activation Maps for Manufact
 Aditya Balu, Sambit Ghadai, Kin Gwn Lore, Gavin Young, Adarsh Krishnamurthy, Soumik Sarkar  
 
 Demo: [Adam Lab][2]
-![DFM](./demo.mp4)
-
+<video controls="controls">
+  <source type="video/mp4" src="demo.mp4"></source>
+  <p>Your browser does not support the video element.</p>
+</video>
 
 ## Packages needed
   Keras, Tensorflow
 
 ## Usage
 You can either import the GradCAM function:
+
     from GradCAM import prepareGradCAM, GradCAM
     activationFunction=prepareGradCAM(cnnModel, layerIdx, nbClasses)
+
 activationFunction is a Keras Function for computing the class activation map
 
 ## License
