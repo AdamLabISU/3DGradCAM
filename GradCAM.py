@@ -1,8 +1,16 @@
 import tensorflow as tf
 import numpy as np
 from keras import backend as K
-from keras.models import Sequential
+from keras.models import Sequential , model_from_json
 from keras.layers import Lambda
+from tensorflow.python.framework import ops
+from scipy.ndimage.interpolation import zoom
+from keras.models import load_model
+from loadModel import loadModel
+import keras
+import tempfile
+import os
+
 def loss_calculation(x, category_index, nb_classes):
     return tf.multiply(x, K.one_hot((category_index), nb_classes))
 
@@ -12,7 +20,7 @@ def loss_calculation_shape(input_shape):
 def normalize(x):
     return x / (K.sqrt(K.mean(K.square(x))) + 1e-5)
 
-def prepareGradCAM(input_model,input_layer_index,nb_classes):
+def prepareGradCAM(input_model,conv_layer_index,nb_classes):
     model = input_model
     #  because non-manufacturability is 1
     explanation_catagory = 1
@@ -28,43 +36,88 @@ def prepareGradCAM(input_model,input_layer_index,nb_classes):
 
     return gradient_function
 
+def registerGradient():
+    if "GuidedBackProp" not in ops._gradient_registry._registry:
+        @ops.RegisterGradient("GuidedBackProp")
+        def _GuidedBackProp(op, grad):
+            dtype = op.inputs[0].dtype
+            return grad * tf.cast(grad > 0., dtype) * \
+                tf.cast(op.inputs[0] > 0., dtype)
+
+def compileSaliencyFunction(model, activation_layer=-5):
+    input_img = model.input
+    layer_output = model.layers[activation_layer].output
+    max_output = K.max(layer_output, axis=3)
+    saliency = K.gradients(K.sum(max_output), input_img)[0]
+    return K.function([input_img, K.learning_phase()], [saliency])
+
+def modifyBackprop(model, name,model_no,channels,activation,voxelCount,nbClasses):
+    g = tf.get_default_graph()
+    with g.gradient_override_map({'Relu': name}):
+
+        # get layers that have an activation
+        layer_dict = [layer for layer in model.layers[1:]
+                      if hasattr(layer, 'activation')]
+
+        # replace relu activation
+        for layer in layer_dict:
+            if layer.activation == keras.activations.relu:
+                layer.activation = tf.nn.relu
+    model = loadModel(model_no,channels,activation,voxelCount,nbClasses)
+    model.load_weights('weights\model%s_%schannel_%sactivation_%svoxel_count_%sclasses.h5'%(model_no,channels,activation,voxelCount,nbClasses))
+
+    #   Popping the softmax layer as it creates ambiguity in the explanation
+    model.pop()
+
+    return model
+    # model_path = next(tempfile._get_candidate_names())
+    #
+    # model.save_weights(model_path+'.h5')
+    # model_json = model.to_json()
+    # with open(model_path+'.json', "w") as json_file:
+    #     json_file.write(model_json)
+    #
+    # jsonFile = open(model_path+'.json', 'r')
+    # loadedModeljson = jsonFile.read()
+    # jsonFile.close()
+    # try:
+    #     model1 = model_from_json(loadedModeljson)
+    #     model1.load_weights(model_path+'.h5')
+    #     return model1
+    # finally:
+    #     os.remove(model_path+'.h5')
+    #     os.remove(model_path+'.json')
 
 def GradCAM(gradient_function, input_file):
     explanation_catagory=1
     # Shape of the fully convolutional layer to use
     f=5
     output, grads_val = gradient_function([input_file, 0])
-    output = output[0, :]
+    grads_val = grads_val / (np.max(grads_val) + K.epsilon())
     # print(grads_val.shape)
     weights = np.mean(grads_val, axis=(1, 2, 3))
-    # print('weights', weights)
-    grad_cam = np.ones(output.shape[0:3], dtype=np.float32)
+    weights.flatten()
+    print('weights', weights)
+    print('output', output.shape)
+    if K.image_data_format() == "channels_last":
+        grad_cam = np.ones(output.shape[1:-1], dtype=K.floatx())
+    else:
+        grad_cam = np.ones(output.shape[2:], dtype=K.floatx())
 
     for i, w in enumerate(np.transpose(weights)):
-        grad_cam += w * output[:, :, :, i]
+        if K.image_data_format() == "channels_last":
+            grad_cam += w * output[0, ..., i]
+        else:
+            grad_cam += w * output[0, i,...]
 
     grad_cam = np.maximum(grad_cam, 0)
     print(weights)
     grad_cam = grad_cam / np.max(grad_cam)
-    attMap = np.zeros(input_file.shape[1] *
-                    input_file.shape[2] * input_file.shape[3])
-    grad_cam = np.reshape(grad_cam, (f * f * f),order='C')
+    attMap = np.zeros_like(input_file)
 
-
-#  Linearly interpolating the grad_cam to the size of input_file to get attMap
-    input_file = np.reshape(input_file, (64 * 64 * 64),order='C')
-    attMap = np.reshape(attMap, (64 * 64 * 64),order='C')
-    for k in range(64):
-        for j in range(64):
-            for i in range(64):
-                i1 = int((i / 64.0) * f)
-                j1 = int((j / 64.0) * f)
-                k1 = int((k / 64.0) * f)
-                attMap[64 * 64 * k + 64 * j + i] = grad_cam[f * f * k1 + f * j1 + i1]
-                if (input_file[64 * 64 * k + 64 * j + i] == 0):
-                    attMap[64 * 64 * k + 64 * j + i] = 0
+    zoom_factor = [i / (j * 1.0) for i, j in iter(zip(input_file.shape, grad_cam.shape))]
+    attMap[...,0] = zoom(grad_cam, zoom_factor)
 
     attMap = (1 * np.float32(attMap)) + (1 * np.float32(input_file))
-
     attMap = (attMap / np.max(attMap))
-    return np.reshape(attMap,(64,64,64),order='C')
+    return attMap

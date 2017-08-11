@@ -3,7 +3,7 @@ import os
 import argparse
 import glob
 parser = argparse.ArgumentParser(description='run GRADCAM with a particular model')
-parser.add_argument('-m', '--model', type=int, default=3,
+parser.add_argument('-m', '--model', type=int, default=1,
                     help='Model 1, 2 or 3')
 parser.add_argument('-c','--channels',type=int,default=1,help="Select the representation in terms of channels, 1 or 3 or 4")
 parser.add_argument('-a', '--activation', type=str, default='relu', help='Select from relu/leakyrelu/prelu/elu')
@@ -38,7 +38,8 @@ from keras.layers.normalization import BatchNormalization
 import sys
 import numpy as np
 import scipy.io as sio
-from GradCAM import prepareGradCAM, GradCAM
+from GradCAM import prepareGradCAM, GradCAM, registerGradient, modifyBackprop, compileSaliencyFunction
+from loadModel import loadModel
 
 p=['inouts','xNormals','yNormals','zNormals']
 
@@ -54,16 +55,7 @@ def loadFile(array,filename, xVoxelCount, yVoxelCount, zVoxelCount, channel):
 
 if __name__ == '__main__':
 
-    #  load the model\ used for GradCAM and its corresponding weights
-    jsonFile = open('model\model%s_%schannel_%sactivation_%svoxel_count_%sclasses.json'%(model_no,channels,activation,voxelCount,nbClasses), 'r')
-    loadedModeljson = jsonFile.read()
-    jsonFile.close()
-
-    cnnModel = model_from_json(loadedModeljson)
-    print('... compiling model')
-    cnnModel.compile(loss='binary_crossentropy', optimizer='adadelta',
-                  metrics=["binary_accuracy"])
-    cnnModel.summary()
+    cnnModel = loadModel(model_no,channels,activation,voxelCount,nbClasses)
     cnnModel.load_weights('weights\model%s_%schannel_%sactivation_%svoxel_count_%sclasses.h5'%(model_no,channels,activation,voxelCount,nbClasses))
 
     #   Popping the softmax layer as it creates ambiguity in the explanation
@@ -73,7 +65,9 @@ if __name__ == '__main__':
 
     #   Keras function for getting the GradCAM
     activationFunction=prepareGradCAM(cnnModel, layerIdx, nbClasses)
-
+    # registerGradient()
+    guidedCNNModel = modifyBackprop(cnnModel, 'GuidedBackProp',model_no,channels,activation,voxelCount,nbClasses)
+    saliency_fn = compileSaliencyFunction(guidedCNNModel)
     if example_no=="all":
         list_raw = glob.glob("Examples\inouts\*.raw")
         for fileidx, filename in enumerate (list_raw):
@@ -83,8 +77,13 @@ if __name__ == '__main__':
             predicted_class = cnnModel.predict(array)
             print(filename,'has a predicted class',predicted_class)
             attMap = GradCAM(activationFunction, array)
-            attMap*=255.0
-            attMap.astype('uint8').tofile("GradCAM_outputs/"+filename)
+            gBackprop = saliency_fn([array, 0])
+            gGradCam = gBackprop[0] * attMap[..., np.newaxis]
+            gGradCam = (gGradCam / np.max(gGradCam))
+            finalOutput = (1 * np.float32(gGradCam)) + 1*np.float32(array)
+            finalOutput = (finalOutput / np.max(finalOutput))
+            finalOutput*=255.0
+            finalOutput.astype('uint8').tofile("GradCAM_outputs/"+filename)
     else:
         filename="Examples/inouts/"+example_no+".raw"
         array=np.zeros((1,voxelCount,voxelCount,voxelCount,channels))
@@ -93,6 +92,12 @@ if __name__ == '__main__':
         predicted_class = cnnModel.predict(array)
         print(filename,'has a predicted class',predicted_class)
         attMap = GradCAM(activationFunction, array)
-        attMap*=255.0
-        attMap.astype('uint8').tofile("GradCAM_outputs/"+filename)
+        gBackprop = saliency_fn([array, 0])
+        gGradCam = gBackprop[0] * attMap[..., np.newaxis]
+        # attMap*=255.0
+        gGradCam = (gGradCam / np.max(gGradCam))
+        finalOutput = (1 * np.float32(gGradCam)) + (1 * np.float32(array))
+        finalOutput = (finalOutput / np.max(finalOutput))
+        finalOutput*=255.0
+        finalOutput.astype('uint8').tofile("GradCAM_outputs/"+filename)
         print('attention map saved' )
