@@ -76,5 +76,4 @@ def loadModel(model_no,channels,activation,voxel_count,nb_classes):
 
     print('... compiling model')
     model.compile(loss='categorical_crossentropy', optimizer='adadelta', metrics=["accuracy"])
-    model.summary()
     return model

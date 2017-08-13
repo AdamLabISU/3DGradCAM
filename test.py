@@ -60,14 +60,14 @@ if __name__ == '__main__':
 
     #   Popping the softmax layer as it creates ambiguity in the explanation
     cnnModel.pop()
+
     #   The layer index of the last fully convolutional layer after removing the softmax layer
     layerIdx = -4
 
-    #   Keras function for getting the GradCAM
+    #   Keras functions for getting the GradCAM and guided GradCAM
     activationFunction=prepareGradCAM(cnnModel, layerIdx, nbClasses)
-    # registerGradient()
-    guidedCNNModel = modifyBackprop(cnnModel, 'GuidedBackProp',model_no,channels,activation,voxelCount,nbClasses)
-    saliency_fn = compileSaliencyFunction(guidedCNNModel)
+    saliency_fn = compileSaliencyFunction(cnnModel, model_no, channels, activation, voxelCount, nbClasses, activation_layer=-4)
+
     if example_no=="all":
         list_raw = glob.glob("Examples\inouts\*.raw")
         for fileidx, filename in enumerate (list_raw):
@@ -83,7 +83,7 @@ if __name__ == '__main__':
             finalOutput = (1 * np.float32(gGradCam)) + 1*np.float32(array)
             finalOutput = (finalOutput / np.max(finalOutput))
             finalOutput*=255.0
-            finalOutput.astype('uint8').tofile("GradCAM_outputs/"+filename)
+            finalOutput.astype('uint8').tofile("GradCAM_outputs\\"+filename)
     else:
         filename="Examples/inouts/"+example_no+".raw"
         array=np.zeros((1,voxelCount,voxelCount,voxelCount,channels))
@@ -99,5 +99,5 @@ if __name__ == '__main__':
         finalOutput = (1 * np.float32(gGradCam)) + (1 * np.float32(array))
         finalOutput = (finalOutput / np.max(finalOutput))
         finalOutput*=255.0
-        finalOutput.astype('uint8').tofile("GradCAM_outputs/"+filename)
+        finalOutput.astype('uint8').tofile("GradCAM_outputs\\"+filename)
         print('attention map saved' )

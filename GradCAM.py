@@ -44,14 +44,15 @@ def registerGradient():
             return grad * tf.cast(grad > 0., dtype) * \
                 tf.cast(op.inputs[0] > 0., dtype)
 
-def compileSaliencyFunction(model, activation_layer=-5):
-    input_img = model.input
-    layer_output = model.layers[activation_layer].output
-    max_output = K.max(layer_output, axis=3)
-    saliency = K.gradients(K.sum(max_output), input_img)[0]
+def compileSaliencyFunction(model, model_no, channels, activation, voxelCount, nbClasses, activation_layer=-5):
+    guidedModel = modifyBackprop(model, 'GuidedBackProp',model_no,channels,activation,voxelCount,nbClasses)
+    input_img = guidedModel.input
+    layer_output = guidedModel.layers[activation_layer].output
+    saliency = K.gradients(K.sum(layer_output), input_img)[0]
     return K.function([input_img, K.learning_phase()], [saliency])
 
 def modifyBackprop(model, name,model_no,channels,activation,voxelCount,nbClasses):
+    registerGradient()
     g = tf.get_default_graph()
     with g.gradient_override_map({'Relu': name}):
 
@@ -65,28 +66,9 @@ def modifyBackprop(model, name,model_no,channels,activation,voxelCount,nbClasses
                 layer.activation = tf.nn.relu
     model = loadModel(model_no,channels,activation,voxelCount,nbClasses)
     model.load_weights('weights\model%s_%schannel_%sactivation_%svoxel_count_%sclasses.h5'%(model_no,channels,activation,voxelCount,nbClasses))
-
     #   Popping the softmax layer as it creates ambiguity in the explanation
     model.pop()
-
     return model
-    # model_path = next(tempfile._get_candidate_names())
-    #
-    # model.save_weights(model_path+'.h5')
-    # model_json = model.to_json()
-    # with open(model_path+'.json', "w") as json_file:
-    #     json_file.write(model_json)
-    #
-    # jsonFile = open(model_path+'.json', 'r')
-    # loadedModeljson = jsonFile.read()
-    # jsonFile.close()
-    # try:
-    #     model1 = model_from_json(loadedModeljson)
-    #     model1.load_weights(model_path+'.h5')
-    #     return model1
-    # finally:
-    #     os.remove(model_path+'.h5')
-    #     os.remove(model_path+'.json')
 
 def GradCAM(gradient_function, input_file):
     explanation_catagory=1
