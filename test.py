@@ -3,8 +3,8 @@ import os
 import argparse
 import glob
 parser = argparse.ArgumentParser(description='run GRADCAM with a particular model')
-parser.add_argument('-m', '--model', type=int, default=1,
-                    help='Model 1, 2 or 3')
+parser.add_argument('-m', '--model', type=int, default=1,help='Model 1, 2 or 3')
+parser.add_argument('-g', '--GPU', type=str, default=0,help='GPU to use 1, 2 or 3')
 parser.add_argument('-c','--channels',type=int,default=1,help="Select the representation in terms of channels, 1 or 3 or 4")
 parser.add_argument('-a', '--activation', type=str, default='relu', help='Select from relu/leakyrelu/prelu/elu')
 parser.add_argument('-e', '--example_no', type=str, default='all', help='Select the model from  the examples folder for evaluation eg. 1,2,3 etc. , else give all')
@@ -14,13 +14,14 @@ args = parser.parse_args()
 model_no = args.model
 activation = args.activation
 channels = args.channels
+GPU = args.GPU
 voxelCount = 64
 nbClasses = 2
 example_no= args.example_no
 
 ###### TENSORFLOW INITIALIZATION WITH SINGLE GPU ######
 os.environ["KERAS_BACKEND"] = "tensorflow"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = GPU
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import tensorflow as tf
 config = tf.ConfigProto()
