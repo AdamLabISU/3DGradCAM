@@ -10,7 +10,8 @@ from keras.layers.advanced_activations import LeakyReLU, PReLU, ELU
 from keras.layers.normalization import BatchNormalization
 from keras.regularizers import l1, l2
 
-def loadModel(model_no,channels,activation,voxel_count,nb_classes):
+
+def _loadModel(model_no, channels, activation, voxel_count, nb_classes):
     # Deep network architechture building
     print('... building the model')
     if model_no == 1 or model_no == 2 or model_no == 3:
@@ -34,7 +35,7 @@ def loadModel(model_no,channels,activation,voxel_count,nb_classes):
         #     model.add(BatchNormalization(epsilon=1e-05, axis=1, momentum=0.99, weights=None, beta_initializer='zeros', gamma_initializer='ones'))
 
 #  First Convolution3D block
-        model.add(Convolution3D(nb_filters[0], conv_size1, padding='valid',data_format='channels_last', input_shape=(voxel_count, voxel_count, voxel_count, channels)))
+        model.add(Convolution3D(nb_filters[0], conv_size1, padding='valid', data_format='channels_last', input_shape=(voxel_count, voxel_count, voxel_count, channels)))
         if activation == 'relu':
             model.add(Activation('relu'))
         if activation == 'leakyrelu':
@@ -72,7 +73,6 @@ def loadModel(model_no,channels,activation,voxel_count,nb_classes):
         model.add(Dropout(0.25))
         model.add(Dense(nb_classes, kernel_initializer='normal'))
         model.add(Activation('softmax'))
-
 
     print('... compiling model')
     model.compile(loss='categorical_crossentropy', optimizer='adadelta', metrics=["accuracy"])
