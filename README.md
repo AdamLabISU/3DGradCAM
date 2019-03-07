@@ -9,7 +9,7 @@ Demo: [Adam Lab][2]
 </video>
 
 ## Packages needed
-  Keras, Tensorflow
+  Keras 2.0.5, Tensorflow 1.2
 
 ## Usage
 You can either import the GradCAM function:
@@ -25,7 +25,7 @@ BSD
 ### Future work
 The following codes shall be made available soon:
 1. Data Generation using ACIS solid modeling kernel
-2. GPU Accelerated Voxelization
+2. GPU Accelerated Voxelization: Available now @ https://github.com/idealab-isu/GPView
 3. Training
 4. GPU accelerated Volume Rendering of GradCAM output
 
